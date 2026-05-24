@@ -2,284 +2,838 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Backtest Pro</title>
-  <!-- Sourced securely via standalone CDN -->
-  <script src="https://unpkg.com"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg:        #090b0f;
+      --panel:     #0d1117;
+      --border:    #1a2233;
+      --accent:    #00e5ff;
+      --green:     #00e676;
+      --red:       #ff1744;
+      --amber:     #ffab00;
+      --text:      #c9d1d9;
+      --muted:     #4a5568;
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-ui:   'Rajdhani', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 15px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── HEADER ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      color: var(--accent);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .logo span { color: var(--text); }
+
+    #status-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid var(--muted);
+      color: var(--muted);
+      transition: all .3s;
+    }
+
+    #status-badge.ok    { border-color: var(--green); color: var(--green); }
+    #status-badge.error { border-color: var(--red);   color: var(--red);   }
+    #status-badge.warn  { border-color: var(--amber); color: var(--amber); }
+
+    /* ── TICKER BAR ── */
+    .ticker-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      background: #0a0d12;
+    }
+
+    #price-display {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      color: var(--accent);
+      letter-spacing: 1px;
+    }
+
+    #price-change {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: rgba(0,230,118,.12);
+      color: var(--green);
+    }
+
+    #position-badge {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 3px;
+      display: none;
+    }
+
+    #position-badge.long  { background: rgba(0,230,118,.15); color: var(--green); border: 1px solid var(--green); }
+    #position-badge.short { background: rgba(255,23,68,.15);  color: var(--red);   border: 1px solid var(--red);   }
+
+    /* ── CHART ── */
+    #chart-wrap {
+      position: relative;
+      width: 100%;
+      background: var(--bg);
+    }
+
+    #chart { width: 100%; height: 280px; }
+
+    /* ── NOTIFICATION TOAST ── */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1a2233;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 10px 18px;
+      border-radius: 6px;
+      z-index: 999;
+      transition: transform .3s ease, opacity .3s ease;
+      opacity: 0;
+      white-space: nowrap;
+      max-width: 90vw;
+    }
+
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    #toast.green { border-color: var(--green); color: var(--green); }
+    #toast.red   { border-color: var(--red);   color: var(--red);   }
+    #toast.amber { border-color: var(--amber); color: var(--amber); }
+
+    /* ── CONTROLS ── */
+    .controls-panel {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .row + .row { margin-top: 8px; }
+
+    /* Nav buttons */
+    .btn {
+      font-family: var(--font-ui);
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 1px;
+      border: 1px solid var(--border);
+      background: #111822;
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all .15s;
+      text-transform: uppercase;
+    }
+
+    .btn:hover  { background: #1a2233; border-color: var(--accent); color: var(--accent); }
+    .btn:active { transform: scale(.97); }
+
+    .btn.buy  { background: rgba(0,230,118,.1);  border-color: var(--green); color: var(--green); }
+    .btn.sell { background: rgba(255,23,68,.1);   border-color: var(--red);   color: var(--red);   }
+    .btn.close-btn { background: rgba(255,171,0,.1); border-color: var(--amber); color: var(--amber); }
+
+    .btn.buy:hover  { background: rgba(0,230,118,.2); }
+    .btn.sell:hover { background: rgba(255,23,68,.2);  }
+    .btn.close-btn:hover { background: rgba(255,171,0,.2); }
+
+    .btn.tf { padding: 6px 10px; font-size: 11px; }
+    .btn.tf.active { background: rgba(0,229,255,.1); border-color: var(--accent); color: var(--accent); }
+
+    .btn.nav { font-size: 16px; padding: 8px 16px; }
+
+    /* Lot size input */
+    .lot-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+    }
+
+    .lot-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .lot-input {
+      background: #111822;
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 6px 10px;
+      border-radius: 4px;
+      width: 80px;
+      text-align: center;
+    }
+
+    .lot-input:focus { outline: none; border-color: var(--accent); }
+
+    /* ── STATS GRID ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border-top: 1px solid var(--border);
+    }
+
+    .stat-cell {
+      background: var(--panel);
+      padding: 10px 14px;
+    }
+
+    .stat-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      color: var(--text);
+    }
+
+    .stat-value.green { color: var(--green); }
+    .stat-value.red   { color: var(--red);   }
+    .stat-value.cyan  { color: var(--accent); }
+
+    /* ── TRADE LOG ── */
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .log-title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    #clear-btn {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      background: none;
+      border: 1px solid var(--muted);
+      color: var(--muted);
+      padding: 2px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    #clear-btn:hover { border-color: var(--red); color: var(--red); }
+
+    #trade-log {
+      max-height: 180px;
+      overflow-y: auto;
+      background: var(--bg);
+    }
+
+    #trade-log::-webkit-scrollbar { width: 4px; }
+    #trade-log::-webkit-scrollbar-track { background: transparent; }
+    #trade-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .trade-row {
+      display: grid;
+      grid-template-columns: 30px 40px 1fr 1fr 1fr;
+      gap: 6px;
+      align-items: center;
+      padding: 7px 14px;
+      border-bottom: 1px solid #0d1117;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      animation: fadeIn .3s ease;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+
+    .trade-row:hover { background: #0d1117; }
+    .trade-num { color: var(--muted); }
+    .trade-type.B { color: var(--green); }
+    .trade-type.S { color: var(--red); }
+    .trade-pnl.pos { color: var(--green); }
+    .trade-pnl.neg { color: var(--red); }
+
+    .empty-log {
+      text-align: center;
+      padding: 24px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+  </style>
 </head>
+<body>
 
-<body style="background:black; color:white; font-family: sans-serif; padding: 15px; margin: 0;">
+<!-- HEADER -->
+<header>
+  <div class="logo">BACKTEST<span>PRO</span></div>
+  <div id="status-badge">LOADING...</div>
+</header>
 
-<h2>Backtest Pro</h2>
-
-<!-- System Status Debug Text Container -->
-<p id="status" style="color: yellow; font-size: 13px; margin: 5px 0;">System Status: Loading Assets...</p>
-
-<!-- Chart target container -->
-<div id="chart" style="height:300px; width: 100%; background: #000;"></div>
-
-<div style="margin: 15px 0;">
-  <button onclick="prevBar()" style="padding: 8px 12px;">◀</button>
-  <button onclick="nextBar()" style="padding: 8px 12px;">▶</button>
-  <button onclick="buy()" style="background: green; color: white; padding: 8px 12px; border: none; font-weight: bold;">BUY</button>
-  <button onclick="sell()" style="background: red; color: white; padding: 8px 12px; border: none; font-weight: bold;">SELL</button>
-  <button onclick="closeTrade()" style="background: gray; color: white; padding: 8px 12px; border: none; font-weight: bold;">CLOSE</button>
+<!-- TICKER -->
+<div class="ticker-row">
+  <div id="price-display">-.-----</div>
+  <div id="price-change">+0.0%</div>
+  <div id="position-badge">NO POSITION</div>
 </div>
-  
-<p id="price">Price: -</p>
-<p id="profit">Profit: -</p>
-<p id="winrate">Win Rate: -</p>
 
-<div style="margin-top: 15px;">
-  <button onclick="setTimeframe(1)">1m</button>
-  <button onclick="setTimeframe(5)">5m</button>
-  <button onclick="setTimeframe(15)">15m</button>
-  <button onclick="setTimeframe(60)">1H</button>
+<!-- CHART -->
+<div id="chart-wrap">
+  <div id="chart"></div>
 </div>
- 
+
+<!-- CONTROLS -->
+<div class="controls-panel">
+  <!-- Row 1: Navigation + Trade buttons -->
+  <div class="row">
+    <button class="btn nav" onclick="prevBar()">◀</button>
+    <button class="btn nav" onclick="nextBar()">▶</button>
+    <button class="btn buy"       onclick="openTrade('BUY')">BUY</button>
+    <button class="btn sell"      onclick="openTrade('SELL')">SELL</button>
+    <button class="btn close-btn" onclick="closeTrade()">CLOSE</button>
+    <div class="lot-wrap">
+      <span class="lot-label">Lot</span>
+      <input class="lot-input" id="lot-size" type="number" value="0.1" min="0.01" max="100" step="0.01">
+    </div>
+  </div>
+  <!-- Row 2: Timeframes -->
+  <div class="row">
+    <button class="btn tf active" onclick="setTimeframe(1,  this)">1m</button>
+    <button class="btn tf"        onclick="setTimeframe(5,  this)">5m</button>
+    <button class="btn tf"        onclick="setTimeframe(15, this)">15m</button>
+    <button class="btn tf"        onclick="setTimeframe(60, this)">1H</button>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-grid">
+  <div class="stat-cell">
+    <div class="stat-label">Open P&L (pips)</div>
+    <div class="stat-value cyan" id="open-pnl">—</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-label">Open P&L ($)</div>
+    <div class="stat-value cyan" id="open-pnl-usd">—</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-label">Total P&L ($)</div>
+    <div class="stat-value" id="total-pnl">$0.00</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-label">Win Rate</div>
+    <div class="stat-value" id="win-rate">—</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-label">Trades</div>
+    <div class="stat-value" id="trade-count">0</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-label">Bar</div>
+    <div class="stat-value cyan" id="bar-counter">—</div>
+  </div>
+</div>
+
+<!-- TRADE LOG -->
+<div class="log-header">
+  <div class="log-title">Trade History</div>
+  <button id="clear-btn" onclick="clearTrades()">CLEAR</button>
+</div>
+<div id="trade-log">
+  <div class="empty-log">No trades yet. Use BUY / SELL to begin.</div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
 <script>
-// ===== STATE STORAGE =====
-let rawBars = [];   
-let bars = [];      
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let rawBars      = [];
+let bars         = [];
 let currentIndex = 1;
+let currentTf    = 1;
 
-// Trade Records
-let currentPosition = null; 
-let trades = [];            
+let currentPosition = null;   // { type, entryPrice, entryIndex, lotSize }
+let trades          = [];
 
-// ===== INITIALIZE CHART ENGINE =====
-const chartContainer = document.getElementById('chart');
+const PIP_VALUE_PER_LOT = 10; // $10 per pip per standard lot (EURUSD)
+const PIP_SIZE          = 0.0001;
 
-const getTargetWidth = () => {
-    const parentWidth = chartContainer.getBoundingClientRect().width;
-    return parentWidth > 0 ? parentWidth : (window.innerWidth - 30);
+// ══════════════════════════════════════════════
+//  CHART INIT
+// ══════════════════════════════════════════════
+const chartEl = document.getElementById('chart');
+
+const getW = () => {
+  const w = chartEl.getBoundingClientRect().width;
+  return w > 0 ? w : window.innerWidth;
 };
 
-const chart = LightweightCharts.createChart(chartContainer, {
-    width: getTargetWidth(),
-    height: 300,
-    layout: { background: { color: '#000000' }, textColor: '#ffffff' },
-    grid: { vertLines: { color: '#111111' }, horzLines: { color: '#111111' } },
-    timeScale: { timeVisible: true, secondsVisible: false }
+const chart = LightweightCharts.createChart(chartEl, {
+  width:  getW(),
+  height: 280,
+  layout: { background: { color: '#090b0f' }, textColor: '#4a5568' },
+  grid:   { vertLines: { color: '#0d1117' }, horzLines: { color: '#0d1117' } },
+  timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#1a2233' },
+  rightPriceScale: { borderColor: '#1a2233' },
+  crosshair: {
+    vertLine: { color: '#00e5ff44', labelBackgroundColor: '#0d1117' },
+    horzLine: { color: '#00e5ff44', labelBackgroundColor: '#0d1117' }
+  }
 });
 
 const candleSeries = chart.addCandlestickSeries({
-    upColor: '#26a69a', downColor: '#ef5350',
-    borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350'
+  upColor: '#00e676', downColor: '#ff1744',
+  borderVisible: false,
+  wickUpColor: '#00e676', wickDownColor: '#ff1744'
 });
 
-window.addEventListener('resize', () => {
-    chart.resize(getTargetWidth(), 300);
+const markerSeries = chart.addLineSeries({
+  color: 'transparent', lineWidth: 1,
+  priceLineVisible: false, lastValueVisible: false
 });
 
-// ===== FIXED MOCK DATA (Uses correct UNIX Timestamps) =====
-const mockData = [
-  { time: 1777593600, open: 1.0890, high: 1.0895, low: 1.0888, close: 1.0892 },
-  { time: 1777593660, open: 1.0892, high: 1.0898, low: 1.0891, close: 1.0897 },
-  { time: 1777593720, open: 1.0897, high: 1.0902, low: 1.0895, close: 1.0900 },
-  { time: 1777593780, open: 1.0900, high: 1.0905, low: 1.0898, close: 1.0903 }
-];
+window.addEventListener('resize', () => chart.resize(getW(), 280));
 
-// ===== SYSTEM STARTUP PROCEDURES =====
+// ══════════════════════════════════════════════
+//  MOCK FALLBACK DATA  (4 h of 1-min bars)
+// ══════════════════════════════════════════════
+function generateMock() {
+  const data = [];
+  let t = 1700000000;
+  let price = 1.0890;
+  for (let i = 0; i < 240; i++) {
+    const move  = (Math.random() - 0.49) * 0.0008;
+    const open  = price;
+    const close = +(open + move).toFixed(5);
+    const high  = +(Math.max(open, close) + Math.random() * 0.0003).toFixed(5);
+    const low   = +(Math.min(open, close) - Math.random() * 0.0003).toFixed(5);
+    data.push({ time: t, open, high, low, close });
+    price = close;
+    t += 60;
+  }
+  return data;
+}
+
+// ══════════════════════════════════════════════
+//  STARTUP
+// ══════════════════════════════════════════════
 async function init() {
-    try {
-        await loadCSV();
-    } catch (e) {
-        console.warn("CSV parser error, using mock fallback data.", e);
-        document.getElementById("status").innerText = "Status: data.csv error! Running Mock Dataset.";
-        rawBars = [...mockData];
-        bars = [...rawBars];
-        currentIndex = Math.min(4, bars.length);
-        updateChart();
-    }
+  setStatus('LOADING', '');
+  try {
+    await loadCSV();
+  } catch (e) {
+    console.warn('CSV load failed, using mock data.', e);
+    setStatus('MOCK', 'warn');
+    rawBars = generateMock();
+    finishLoad('Mock dataset (240 bars)');
+  }
 }
 
-// ===== LOCAL CSV PARSE ENGINE =====
 async function loadCSV() {
-    let response = await fetch("data.csv"); 
-    if (!response.ok) throw new Error("Network data file mismatch");
-    let text = await response.text();
+  const res = await fetch('data.csv');
+  if (!res.ok) throw new Error('fetch failed');
+  const text = await res.text();
+  const lines = text.split('\n');
 
-    let lines = text.split("\n");
-    let startIndex = 0;
-    
-    for(let i = 0; i < lines.length; i++) {
-        let cleanLine = lines[i].toLowerCase().trim();
-        if(cleanLine.startsWith("date") || cleanLine.includes("open")) {
-            startIndex = i + 1;
-            break;
-        }
-    }
+  let start = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].toLowerCase().trim();
+    if (l.startsWith('date') || l.includes('open')) { start = i + 1; break; }
+  }
 
-    rawBars = lines.slice(startIndex).filter(line => line.trim() !== "").map(line => {
-        let parts = line.split(",");
-        if (parts.length < 5) return null;
-        
-        let dateStr = parts[0];
-        let open = parts[1];
-        let high = parts[2];
-        let low = parts[3];
-        let close = parts[4];
-        
-        let timestampSeconds = Math.floor(Date.parse(dateStr.trim().replace(" ", "T")) / 1000);
-        if (isNaN(timestampSeconds)) return null;
+  const seen = new Set();
+  rawBars = lines.slice(start)
+    .filter(l => l.trim())
+    .map(line => {
+      const p = line.split(',');
+      if (p.length < 5) return null;
+      const ts = Math.floor(Date.parse(p[0].trim().replace(' ', 'T')) / 1000);
+      if (isNaN(ts)) return null;
+      return {
+        time:  ts,
+        open:  parseFloat(p[1]),
+        high:  parseFloat(p[2]),
+        low:   parseFloat(p[3]),
+        close: parseFloat(p[4])
+      };
+    })
+    .filter(b => b !== null)
+    .sort((a, b) => a.time - b.time)
+    .filter(b => { if (seen.has(b.time)) return false; seen.add(b.time); return true; });
 
-        return {
-            time: timestampSeconds,
-            open: parseFloat(open),
-            high: parseFloat(high),
-            low: parseFloat(low),
-            close: parseFloat(close)
-        };
-    }).filter(item => item !== null);
-
-    if (rawBars.length === 0) throw new Error("No data parsed");
-
-    rawBars.sort((a, b) => a.time - b.time);
-
-    document.getElementById("status").innerText = `Status: Loaded ${rawBars.length} bars from data.csv successfully!`;
-    bars = [...rawBars];
-    currentIndex = Math.min(4, bars.length); 
-    updateChart();
+  if (rawBars.length === 0) throw new Error('empty');
+  finishLoad(`${rawBars.length} bars from data.csv`);
 }
 
-// ===== DISPLAY & INTERACTION SYSTEMS =====
+function finishLoad(msg) {
+  bars = [...rawBars];
+  currentIndex = Math.min(50, bars.length);
+  setStatus(`✓ ${msg}`, 'ok');
+  updateChart();
+}
+
+// ══════════════════════════════════════════════
+//  CHART UPDATE
+// ══════════════════════════════════════════════
 function updateChart() {
-    if (!bars || bars.length === 0) return;
-    
-    if (currentIndex > bars.length) currentIndex = bars.length;
-    if (currentIndex < 1) currentIndex = 1;
+  if (!bars.length) return;
+  currentIndex = Math.max(1, Math.min(currentIndex, bars.length));
 
-    const visibleBars = bars.slice(0, currentIndex);
-    candleSeries.setData(visibleBars);
-    
-    setTimeout(() => {
-        chart.timeScale().fitContent();
-    }, 50);
+  const visible = bars.slice(0, currentIndex);
+  candleSeries.setData(visible);
+  redrawMarkers();
 
-    let currentBar = bars[currentIndex - 1];
-    let price = currentBar ? currentBar.close : 0;
-    document.getElementById("price").innerText = "Price: " + price.toFixed(5);
+  setTimeout(() => chart.timeScale().fitContent(), 50);
 
-    calculateOpenProfit(price);
+  const bar   = bars[currentIndex - 1];
+  const price = bar.close;
+
+  // price display
+  document.getElementById('price-display').textContent = price.toFixed(5);
+  document.getElementById('bar-counter').textContent =
+    `${currentIndex} / ${bars.length}`;
+
+  // price change vs previous
+  if (currentIndex > 1) {
+    const prev   = bars[currentIndex - 2].close;
+    const change = ((price - prev) / prev * 100).toFixed(3);
+    const el     = document.getElementById('price-change');
+    el.textContent = (change >= 0 ? '+' : '') + change + '%';
+    el.style.background = change >= 0 ? 'rgba(0,230,118,.12)' : 'rgba(255,23,68,.12)';
+    el.style.color      = change >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+
+  updateOpenPnl(price);
 }
 
-// ===== NAVIGATION TRACKING ENGINE =====
+// ══════════════════════════════════════════════
+//  MARKERS
+// ══════════════════════════════════════════════
+function redrawMarkers() {
+  const markers = [];
+
+  trades.forEach(t => {
+    if (t.entryIndex <= currentIndex) {
+      markers.push({
+        time:     bars[t.entryIndex - 1].time,
+        position: t.type === 'BUY' ? 'belowBar' : 'aboveBar',
+        color:    t.type === 'BUY' ? '#00e676' : '#ff1744',
+        shape:    t.type === 'BUY' ? 'arrowUp' : 'arrowDown',
+        text:     t.type === 'BUY' ? '▲ B' : '▼ S'
+      });
+    }
+    if (t.exitIndex && t.exitIndex <= currentIndex) {
+      markers.push({
+        time:     bars[t.exitIndex - 1].time,
+        position: t.type === 'BUY' ? 'aboveBar' : 'belowBar',
+        color:    '#ffab00',
+        shape:    'circle',
+        text:     'X'
+      });
+    }
+  });
+
+  // open position marker
+  if (currentPosition) {
+    markers.push({
+      time:     bars[currentPosition.entryIndex - 1].time,
+      position: currentPosition.type === 'BUY' ? 'belowBar' : 'aboveBar',
+      color:    currentPosition.type === 'BUY' ? '#00e676' : '#ff1744',
+      shape:    currentPosition.type === 'BUY' ? 'arrowUp' : 'arrowDown',
+      text:     currentPosition.type === 'BUY' ? '▲ B' : '▼ S'
+    });
+  }
+
+  markers.sort((a, b) => a.time - b.time);
+  candleSeries.setMarkers(markers);
+}
+
+// ══════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════
 function nextBar() {
-    if (currentIndex < bars.length) {
-        currentIndex++;
-        updateChart();
-    }
+  if (currentIndex < bars.length) { currentIndex++; updateChart(); }
+  else toast('End of data', 'amber');
 }
 
-// Fixed decrement boundary index logic configuration mappings
 function prevBar() {
-    if (currentIndex > 1) {
-        currentIndex--;
-        updateChart();
-    }
+  if (currentIndex > 1) { currentIndex--; updateChart(); }
 }
 
-// ===== TIMEFRAME AGGREGATION MECHANICS =====
-function setTimeframe(minutes) {
-    if (!rawBars || rawBars.length === 0) return;
-    bars = [];
-    const intervalSeconds = minutes * 60;
+// ══════════════════════════════════════════════
+//  TIMEFRAME
+// ══════════════════════════════════════════════
+function setTimeframe(minutes, btn) {
+  if (!rawBars.length) return;
+  currentTf = minutes;
 
-    let currentChunk = [];
-    let currentChunkStart = Math.floor(rawBars[0].time / intervalSeconds) * intervalSeconds;
+  // update active button
+  document.querySelectorAll('.btn.tf').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
 
-    for (let i = 0; i < rawBars.length; i++) {
-        let bar = rawBars[i];
-        if (bar.time < currentChunkStart + intervalSeconds) {
-            currentChunk.push(bar);
-        } else {
-            if (currentChunk.length > 0) {
-                bars.push({
-                    time: currentChunkStart,
-                    open: currentChunk[0].open,
-                    high: Math.max(...currentChunk.map(b => b.high)),
-                    low: Math.min(...currentChunk.map(b => b.low)),
-                    close: currentChunk[currentChunk.length - 1].close
-                });
-            }
-            currentChunk = [bar];
-            currentChunkStart = Math.floor(bar.time / intervalSeconds) * intervalSeconds;
-        }
+  if (minutes === 1) {
+    const seen = new Set();
+    bars = rawBars.filter(b => { if (seen.has(b.time)) return false; seen.add(b.time); return true; });
+    currentIndex = Math.min(currentIndex, bars.length);
+    updateChart(); return;
+  }
+
+  const intv = minutes * 60;
+  bars = [];
+  let chunk = [];
+  let chunkStart = Math.floor(rawBars[0].time / intv) * intv;
+
+  for (const bar of rawBars) {
+    if (bar.time < chunkStart + intv) {
+      chunk.push(bar);
+    } else {
+      if (chunk.length) pushAgg(chunk, chunkStart);
+      chunk = [bar];
+      chunkStart = Math.floor(bar.time / intv) * intv;
     }
-    
-    if (currentChunk.length > 0) {
-        bars.push({
-            time: currentChunkStart,
-            open: currentChunk[0].open,
-            high: Math.max(...currentChunk.map(b => b.high)),
-            low: Math.min(...currentChunk.map(b => b.low)),
-            close: currentChunk[currentChunk.length - 1].close
-        });
-    }
+  }
+  if (chunk.length) pushAgg(chunk, chunkStart);
 
-    currentIndex = bars.length; 
-    updateChart();
+  currentIndex = Math.min(currentIndex, bars.length);
+  updateChart();
 }
 
-// ===== TRADE ENGINE EXECUTION =====
-function buy() {
-    if (currentPosition) return alert("Close your current trade first!");
-    let price = bars[currentIndex - 1].close;
-    currentPosition = { type: 'BUY', entryPrice: price };
-    alert(`Opened BUY position at ${price.toFixed(5)}`);
+function pushAgg(chunk, t) {
+  bars.push({
+    time:  t,
+    open:  chunk[0].open,
+    high:  Math.max(...chunk.map(b => b.high)),
+    low:   Math.min(...chunk.map(b => b.low)),
+    close: chunk[chunk.length - 1].close
+  });
 }
 
-function sell() {
-    if (currentPosition) return alert("Close your current trade first!");
-    let price = bars[currentIndex - 1].close;
-    currentPosition = { type: 'SELL', entryPrice: price };
-    alert(`Opened SELL position at ${price.toFixed(5)}`);
+// ══════════════════════════════════════════════
+//  TRADE ENGINE
+// ══════════════════════════════════════════════
+function getLot() {
+  const v = parseFloat(document.getElementById('lot-size').value);
+  return isNaN(v) || v <= 0 ? 0.1 : v;
+}
+
+function openTrade(type) {
+  if (currentPosition) { toast('Close current trade first!', 'amber'); return; }
+  const price   = bars[currentIndex - 1].close;
+  const lotSize = getLot();
+  currentPosition = { type, entryPrice: price, entryIndex: currentIndex, lotSize };
+
+  const badge = document.getElementById('position-badge');
+  badge.style.display = 'block';
+  badge.className = type === 'BUY' ? 'long' : 'short';
+  badge.textContent = `${type} ${lotSize}L @ ${price.toFixed(5)}`;
+
+  redrawMarkers();
+  toast(`${type} ${lotSize} lot @ ${price.toFixed(5)}`, type === 'BUY' ? 'green' : 'red');
 }
 
 function closeTrade() {
-    if (!currentPosition) return alert("No active trades to close.");
-    let exitPrice = bars[currentIndex - 1].close;
-    let profit = 0;
+  if (!currentPosition) { toast('No open trade to close.', 'amber'); return; }
 
-    if (currentPosition.type === 'BUY') {
-        profit = exitPrice - currentPosition.entryPrice;
-    } else {
-        profit = currentPosition.entryPrice - exitPrice;
-    }
+  const exitPrice = bars[currentIndex - 1].close;
+  const rawDiff   = currentPosition.type === 'BUY'
+    ? exitPrice - currentPosition.entryPrice
+    : currentPosition.entryPrice - exitPrice;
 
-    trades.push({ profit: profit, win: profit > 0 });
-    currentPosition = null;
-    
-    updatePerformanceStats();
-    updateChart();
+  const pips   = rawDiff / PIP_SIZE;
+  const usdPnl = pips * PIP_VALUE_PER_LOT * currentPosition.lotSize;
+
+  const trade = {
+    id:         trades.length + 1,
+    type:       currentPosition.type,
+    entryPrice: currentPosition.entryPrice,
+    exitPrice,
+    entryIndex: currentPosition.entryIndex,
+    exitIndex:  currentIndex,
+    lotSize:    currentPosition.lotSize,
+    pips:       +pips.toFixed(1),
+    usdPnl:     +usdPnl.toFixed(2),
+    win:        usdPnl > 0
+  };
+
+  trades.push(trade);
+  currentPosition = null;
+
+  document.getElementById('position-badge').style.display = 'none';
+  document.getElementById('open-pnl').textContent     = '—';
+  document.getElementById('open-pnl-usd').textContent = '—';
+
+  updateStats();
+  redrawMarkers();
+  addTradeRow(trade);
+  toast(`Closed: ${trade.pips > 0 ? '+' : ''}${trade.pips} pips | $${trade.usdPnl >= 0 ? '+' : ''}${trade.usdPnl.toFixed(2)}`,
+        trade.win ? 'green' : 'red');
 }
 
-function calculateOpenProfit(currentPrice) {
-    if (!currentPosition) {
-        document.getElementById("profit").innerText = "Profit: -";
-        return;
-    }
-    let openProfit = currentPosition.type === 'BUY' 
-        ? currentPrice - currentPosition.entryPrice 
-        : currentPosition.entryPrice - currentPrice;
-        
-    document.getElementById("profit").innerText = `Open Profit: ${openProfit.toFixed(5)} (${currentPosition.type})`;
+function updateOpenPnl(price) {
+  if (!currentPosition) return;
+  const rawDiff = currentPosition.type === 'BUY'
+    ? price - currentPosition.entryPrice
+    : currentPosition.entryPrice - price;
+
+  const pips   = rawDiff / PIP_SIZE;
+  const usdPnl = pips * PIP_VALUE_PER_LOT * currentPosition.lotSize;
+
+  const pEl   = document.getElementById('open-pnl');
+  const uEl   = document.getElementById('open-pnl-usd');
+  pEl.textContent  = (pips >= 0 ? '+' : '') + pips.toFixed(1);
+  uEl.textContent  = (usdPnl >= 0 ? '+$' : '-$') + Math.abs(usdPnl).toFixed(2);
+  pEl.className = uEl.className = 'stat-value ' + (pips >= 0 ? 'green' : 'red');
 }
 
-function updatePerformanceStats() {
-    if (trades.length === 0) return;
-    
-    let totalProfit = trades.reduce((sum, t) => sum + t.profit, 0);
-    let wins = trades.filter(t => t.win).length;
-    let winRate = (wins / trades.length) * 100;
+function updateStats() {
+  if (!trades.length) return;
 
-    document.getElementById("winrate").innerText = `Win Rate: ${winRate.toFixed(1)}% (${trades.length} trades)`;
-    alert(`Trade Closed. Net PnL: ${totalProfit.toFixed(5)}`);
+  const totalUsd = trades.reduce((s, t) => s + t.usdPnl, 0);
+  const wins     = trades.filter(t => t.win).length;
+  const wr       = (wins / trades.length * 100).toFixed(1);
+
+  const pnlEl = document.getElementById('total-pnl');
+  pnlEl.textContent = (totalUsd >= 0 ? '+$' : '-$') + Math.abs(totalUsd).toFixed(2);
+  pnlEl.className   = 'stat-value ' + (totalUsd >= 0 ? 'green' : 'red');
+
+  const wrEl = document.getElementById('win-rate');
+  wrEl.textContent = `${wr}%`;
+  wrEl.className   = 'stat-value ' + (parseFloat(wr) >= 50 ? 'green' : 'red');
+
+  document.getElementById('trade-count').textContent = trades.length;
 }
 
+// ══════════════════════════════════════════════
+//  TRADE LOG
+// ══════════════════════════════════════════════
+function addTradeRow(t) {
+  const log = document.getElementById('trade-log');
+  const empty = log.querySelector('.empty-log');
+  if (empty) empty.remove();
+
+  const div = document.createElement('div');
+  div.className = 'trade-row';
+  div.innerHTML = `
+    <span class="trade-num">#${t.id}</span>
+    <span class="trade-type ${t.type[0]}">${t.type}</span>
+    <span>${t.entryPrice.toFixed(5)}</span>
+    <span>${t.exitPrice.toFixed(5)}</span>
+    <span class="trade-pnl ${t.win ? 'pos' : 'neg'}">${t.usdPnl >= 0 ? '+' : ''}$${t.usdPnl.toFixed(2)}</span>
+  `;
+  log.prepend(div);
+}
+
+function clearTrades() {
+  if (!trades.length) return;
+  trades = [];
+  currentPosition = null;
+  document.getElementById('position-badge').style.display = 'none';
+  document.getElementById('trade-log').innerHTML = '<div class="empty-log">No trades yet. Use BUY / SELL to begin.</div>';
+  document.getElementById('total-pnl').textContent   = '$0.00';
+  document.getElementById('total-pnl').className     = 'stat-value';
+  document.getElementById('win-rate').textContent    = '—';
+  document.getElementById('win-rate').className      = 'stat-value';
+  document.getElementById('trade-count').textContent = '0';
+  document.getElementById('open-pnl').textContent    = '—';
+  document.getElementById('open-pnl-usd').textContent= '—';
+  redrawMarkers();
+  toast('Trade history cleared', 'amber');
+}
+
+// ══════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════
+let toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 2800);
+}
+
+// ══════════════════════════════════════════════
+//  STATUS BADGE
+// ══════════════════════════════════════════════
+function setStatus(msg, cls) {
+  const el = document.getElementById('status-badge');
+  el.textContent = msg;
+  el.className   = cls;
+}
+
+// ══════════════════════════════════════════════
+//  KEYBOARD SHORTCUTS
+// ══════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight') nextBar();
+  if (e.key === 'ArrowLeft')  prevBar();
+  if (e.key === 'b' || e.key === 'B') openTrade('BUY');
+  if (e.key === 's' || e.key === 'S') openTrade('SELL');
+  if (e.key === 'c' || e.key === 'C') closeTrade();
+});
+
+// ══════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', init);
 </script>
-
 </body>
 </html>
