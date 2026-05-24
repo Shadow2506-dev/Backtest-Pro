@@ -69,7 +69,7 @@ window.addEventListener('resize', () => {
     chart.resize(getTargetWidth(), 300);
 });
 
-// ===== SAFE FALLBACK MOCK DATA (Uses numerical UNIX Timestamps) =====
+// ===== FIXED MOCK DATA (Uses correct UNIX Timestamps) =====
 const mockData = [
   { time: 1777593600, open: 1.0890, high: 1.0895, low: 1.0888, close: 1.0892 },
   { time: 1777593660, open: 1.0892, high: 1.0898, low: 1.0891, close: 1.0897 },
@@ -82,7 +82,7 @@ async function init() {
     try {
         await loadCSV();
     } catch (e) {
-        console.warn("CSV parse failed, applying mock runtime charts.", e);
+        console.warn("CSV parser error, using mock fallback data.", e);
         rawBars = [...mockData];
         bars = [...rawBars];
         currentIndex = Math.min(4, bars.length);
@@ -90,7 +90,7 @@ async function init() {
     }
 }
 
-// ===== LOCAL CSV PARSE ENGINE (UPDATED) =====
+// ===== LOCAL CSV PARSE ENGINE =====
 async function loadCSV() {
     let response = await fetch("data.csv"); 
     if (!response.ok) throw new Error("Network data file mismatch");
@@ -98,23 +98,29 @@ async function loadCSV() {
 
     let lines = text.split("\n");
     
-    // Discard any parent cell wrap labels if present, locate header row
+    // Fix 1: Make header identification completely case-insensitive
     let startIndex = 0;
-    for(let i=0; i<lines.length; i++) {
-        if(lines[i].toLowerCase().includes("date,open")) {
+    for(let i = 0; i < lines.length; i++) {
+        let cleanLine = lines[i].toLowerCase().trim();
+        if(cleanLine.startsWith("date") || cleanLine.includes("open")) {
             startIndex = i + 1;
             break;
         }
     }
 
     rawBars = lines.slice(startIndex).filter(line => line.trim() !== "").map(line => {
-        // Splitting explicitly maps out the trailing 6th 'Volume' field safely
-        let [dateStr, open, high, low, close, volume] = line.split(",");
+        let parts = line.split(",");
+        if (parts.length < 5) return null;
         
-        // Convert 'YYYY-MM-DD HH:MM' explicitly to a numerical UNIX stamp
+        let dateStr = parts[0];
+        let open = parts[1];
+        let high = parts[2];
+        let low = parts[3];
+        let close = parts[4];
+        
+        // Convert timestamp to UNIX format
         let timestampSeconds = Math.floor(Date.parse(dateStr.trim().replace(" ", "T")) / 1000);
         
-        // Fallback calculation validation check
         if (isNaN(timestampSeconds)) return null;
 
         return {
@@ -126,7 +132,8 @@ async function loadCSV() {
         };
     }).filter(item => item !== null);
 
-    // Sort chronologically just in case raw data inputs are mixed up
+    if (rawBars.length === 0) throw new Error("No data parsed");
+
     rawBars.sort((a, b) => a.time - b.time);
 
     bars = [...rawBars];
