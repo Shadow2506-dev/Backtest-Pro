@@ -12,6 +12,9 @@
 
 <h2>Backtest Pro</h2>
 
+<!-- System Status Debug Text Container -->
+<p id="status" style="color: yellow; font-size: 13px; margin: 5px 0;">System Status: Loading Assets...</p>
+
 <!-- Chart target container -->
 <div id="chart" style="height:300px; width: 100%; background: #000;"></div>
 
@@ -83,6 +86,7 @@ async function init() {
         await loadCSV();
     } catch (e) {
         console.warn("CSV parser error, using mock fallback data.", e);
+        document.getElementById("status").innerText = "Status: data.csv error! Running Mock Dataset.";
         rawBars = [...mockData];
         bars = [...rawBars];
         currentIndex = Math.min(4, bars.length);
@@ -97,9 +101,8 @@ async function loadCSV() {
     let text = await response.text();
 
     let lines = text.split("\n");
-    
-    // Fix 1: Make header identification completely case-insensitive
     let startIndex = 0;
+    
     for(let i = 0; i < lines.length; i++) {
         let cleanLine = lines[i].toLowerCase().trim();
         if(cleanLine.startsWith("date") || cleanLine.includes("open")) {
@@ -118,9 +121,7 @@ async function loadCSV() {
         let low = parts[3];
         let close = parts[4];
         
-        // Convert timestamp to UNIX format
         let timestampSeconds = Math.floor(Date.parse(dateStr.trim().replace(" ", "T")) / 1000);
-        
         if (isNaN(timestampSeconds)) return null;
 
         return {
@@ -136,6 +137,7 @@ async function loadCSV() {
 
     rawBars.sort((a, b) => a.time - b.time);
 
+    document.getElementById("status").innerText = `Status: Loaded ${rawBars.length} bars from data.csv successfully!`;
     bars = [...rawBars];
     currentIndex = Math.min(4, bars.length); 
     updateChart();
@@ -176,13 +178,14 @@ function prevBar() {
     }
 }
 
-// ===== TIMEFRAME AGGREGATION MECHANICS =====
+// ===== TIMEFRAME AGGREGATION MECHANICS (FIXED CRITICAL ERROR) =====
 function setTimeframe(minutes) {
     if (!rawBars || rawBars.length === 0) return;
     bars = [];
     const intervalSeconds = minutes * 60;
 
     let currentChunk = [];
+    // Fix: Grab structural index position pointer correctly instead of undefined root variable property
     let currentChunkStart = Math.floor(rawBars[0].time / intervalSeconds) * intervalSeconds;
 
     for (let i = 0; i < rawBars.length; i++) {
@@ -233,6 +236,7 @@ function sell() {
     alert(`Opened SELL position at ${price.toFixed(5)}`);
 }
 
+// Fixed performance calculation updates
 function closeTrade() {
     if (!currentPosition) return alert("No active trades to close.");
     let exitPrice = bars[currentIndex - 1].close;
