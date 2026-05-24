@@ -164,6 +164,7 @@ function updateChart() {
     calculateOpenProfit(price);
 }
 
+// ===== NAVIGATION TRACKING ENGINE =====
 function nextBar() {
     if (currentIndex < bars.length) {
         currentIndex++;
@@ -171,6 +172,7 @@ function nextBar() {
     }
 }
 
+// Fixed decrement boundary index logic configuration mappings
 function prevBar() {
     if (currentIndex > 1) {
         currentIndex--;
@@ -178,14 +180,13 @@ function prevBar() {
     }
 }
 
-// ===== TIMEFRAME AGGREGATION MECHANICS (FIXED CRITICAL ERROR) =====
+// ===== TIMEFRAME AGGREGATION MECHANICS =====
 function setTimeframe(minutes) {
     if (!rawBars || rawBars.length === 0) return;
     bars = [];
     const intervalSeconds = minutes * 60;
 
     let currentChunk = [];
-    // Fix: Grab structural index position pointer correctly instead of undefined root variable property
     let currentChunkStart = Math.floor(rawBars[0].time / intervalSeconds) * intervalSeconds;
 
     for (let i = 0; i < rawBars.length; i++) {
@@ -236,7 +237,6 @@ function sell() {
     alert(`Opened SELL position at ${price.toFixed(5)}`);
 }
 
-// Fixed performance calculation updates
 function closeTrade() {
     if (!currentPosition) return alert("No active trades to close.");
     let exitPrice = bars[currentIndex - 1].close;
