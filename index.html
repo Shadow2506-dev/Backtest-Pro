@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backtest Pro</title>
+
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+
+<style>
+body {
+  margin: 0;
+  background: #0b0f14;
+  color: white;
+  font-family: Arial;
+}
+#chart {
+  height: 350px;
+}
+.controls {
+  padding: 10px;
+}
+button {
+  margin: 4px;
+  padding: 6px 10px;
+}
+</style>
+</head>
+
+<body>
+
+<h2 style="padding:10px;">Backtest Pro</h2>
+
+<div id="chart"></div>
+
+<div class="controls">
+  <button onclick="prevBar()">◀</button>
+  <button onclick="nextBar()">▶</button>
+
+  <button onclick="buy()">BUY</button>
+  <button onclick="sell()">SELL</button>
+  <button onclick="closeTrade()">CLOSE</button>
+
+  <br><br>
+
+  <button onclick="setTF(1)">1m</button>
+  <button onclick="setTF(5)">5m</button>
+  <button onclick="setTF(15)">15m</button>
+  <button onclick="setTF(60)">1H</button>
+
+  <br><br>
+
+  <button onclick="setTool('trend')">Trend</button>
+  <button onclick="setTool('hline')">H-Line</button>
+  <button onclick="setTool('box')">Box</button>
+  <button onclick="clearDraw()">Clear Draw</button>
+
+  <p id="price">Price: -</p>
+  <p id="stats"></p>
+</div>
+
+<script>
+
+// ===== CHART =====
+const chart = LightweightCharts.createChart(document.getElementById("chart"), {
+  width: window.innerWidth,
+  height: 350,
+  layout: { background: { color: "#0b0f14" }, textColor: "#fff" }
+});
+
+const candleSeries = chart.addCandlestickSeries();
+
+window.addEventListener("resize", () => {
+  chart.resize(window.innerWidth, 350);
+});
+
+// ===== DATA =====
+let rawBars = [
+  { time: 1704067200, open:1.10, high:1.20, low:1.00, close:1.15 },
+  { time: 1704067260, open:1.15, high:1.25, low:1.10, close:1.20 },
+  { time: 1704067320, open:1.20, high:1.30, low:1.15, close:1.18 },
+  { time: 1704067380, open:1.18, high:1.22, low:1.10, close:1.12 },
+  { time: 1704067440, open:1.12, high:1.18, low:1.05, close:1.15 },
+  { time: 1704067500, open:1.15, high:1.20, low:1.10, close:1.17 },
+  { time: 1704067560, open:1.17, high:1.25, low:1.15, close:1.22 }
+];
+
+let bars = rawBars;
+let index = 3;
+
+// ===== UPDATE =====
+function updateChart() {
+  candleSeries.setData(bars.slice(0, index));
+  document.getElementById("price").textContent =
+    "Price: " + bars[index-1].close;
+  updateStats();
+}
+
+// ===== REPLAY =====
+function nextBar() {
+  if (index < bars.length) {
+    index++;
+    updateChart();
+  }
+}
+
+function prevBar() {
+  if (index > 1) {
+    index--;
+    updateChart();
+  }
+}
+
+// ===== TIMEFRAME =====
+function setTF(tf) {
+  let result = [];
+
+  for (let i = 0; i < rawBars.length; i += tf) {
+    let chunk = rawBars.slice(i, i + tf);
+    result.push({
+      time: chunk[0].time,
+      open: chunk[0].open,
+      high: Math.max(...chunk.map(x=>x.high)),
+      low: Math.min(...chunk.map(x=>x.low)),
+      close: chunk[chunk.length-1].close
+    });
+  }
+
+  bars = result;
+  index = 2;
+  updateChart();
+}
+
+// ===== TRADING =====
+let entry = 0;
+let position = "";
+let trades = [];
+
+function buy() {
+  entry = bars[index-1].close;
+  position = "BUY";
+}
+
+function sell() {
+  entry = bars[index-1].close;
+  position = "SELL";
+}
+
+function closeTrade() {
+  let exit = bars[index-1].close;
+  let pnl = 0;
+
+  if (position === "BUY") pnl = exit - entry;
+  if (position === "SELL") pnl = entry - exit;
+
+  trades.push(pnl);
+  position = "";
+}
+
+// ===== ANALYTICS =====
+function updateStats() {
+  let wins = trades.filter(t=>t>0).length;
+  let total = trades.length;
